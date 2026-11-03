@@ -76,6 +76,14 @@ WELL_KNOWN_MAILBOXES = {
     # Do YOU run a public mailbox service? Contact the project to
     # consider having it listed here
 }
+WELL_KNOWN_TRANSITS = {
+    "default": TRANSIT_RELAY,
+    # "none" means "do not use any transit relay" -- Dilation will then only
+    # attempt direct connections (useful on isolated / air-gapped segments
+    # where the public relay is unreachable and both peers can reach each
+    # other directly, or where a different relay is provided out-of-band).
+    "none": None,
+}
 SUPPORTED_FEATURES = [
     "core-v1",  # the only version of the protocol so far
 ]
@@ -114,6 +122,9 @@ class _Config:
     output_debug_messages: TextIO = None  # Option<Writable>
     output_status: TextIO = None  # Option<Readable>
     no_logo: bool = False
+    # Twisted client-endpoint string for the Dilation transit relay (e.g.
+    # "tcp:example.com:4001"). None => direct-only (no transit relay).
+    transit_relay_location: str | None = TRANSIT_RELAY
 
 
 async def wormhole_from_config(reactor, config, on_status, wormhole_create=None):
@@ -1070,7 +1081,7 @@ class FowlWormhole:
     Co-ordinates between the wormhole, user I/O and the daemon state-machine.
     """
 
-    def __init__(self, reactor, wormhole, coop, interactive):
+    def __init__(self, reactor, wormhole, coop, interactive, transit_relay_location=TRANSIT_RELAY):
         self._reactor = reactor
         self._wormhole = wormhole
         self._done = When() # we have shut down completely
@@ -1084,6 +1095,8 @@ class FowlWormhole:
         self._peer_connected = False
         self._dilated = None  # DilatedWormhole instance from wh.dilate()
         self._coop = coop
+        # Where Dilation should look for a transit relay; None => direct-only.
+        self._transit_relay_location = transit_relay_location
 
     # XXX wants to be an IService?
     async def stop(self):
@@ -1442,7 +1455,7 @@ class FowlWormhole:
     async def _do_dilate(self):
         # XXX move FowlWormhole do its own module so imports aren't broken
         self._dilated = await self._coop.dilate(
-            transit_relay_location=TRANSIT_RELAY,
+            transit_relay_location=self._transit_relay_location,
         )
         # the "FowlCoop.dilate" method already listens for commands,
         # incoming connections
@@ -1741,7 +1754,7 @@ async def create_fowl(config, fowl_status_tracker, interactive):
 #    @sm.set_trace
 #    def _(start, edge, end):
 #        print(f"trace: {start} --[ {edge} ]--> {end}")
-    fowl = FowlWormhole(reactor, w, coop, interactive)
+    fowl = FowlWormhole(reactor, w, coop, interactive, config.transit_relay_location)
     return fowl
 
 

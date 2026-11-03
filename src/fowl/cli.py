@@ -13,6 +13,7 @@ from twisted.internet.defer import ensureDeferred
 
 from wormhole.cli.public_relay import (
     RENDEZVOUS_RELAY as PUBLIC_MAILBOX_URL,
+    TRANSIT_RELAY as PUBLIC_TRANSIT_RELAY,
 )
 
 from ._proto import (
@@ -20,6 +21,7 @@ from ._proto import (
     forward,
     frontend_accept_or_invite,
     WELL_KNOWN_MAILBOXES,
+    WELL_KNOWN_TRANSITS,
 )
 from .messages import (
     LocalListener,
@@ -46,6 +48,16 @@ from .visual import littlebitspace_big_logo, littlebitspace_word_logo
     metavar="URL or NAME",
 )
 @click.option(
+    "--transit-helper",
+    default=PUBLIC_TRANSIT_RELAY,
+    help=(
+        'Transit relay for Dilation, as a Twisted client-endpoint string '
+        '(e.g. "tcp:example.com:4001"), or "none" for direct-only connections '
+        '(no transit relay). Defaults to the public transit relay.'
+    ),
+    metavar="ENDPOINT or NAME",
+)
+@click.option(
     "--debug",
     default=None,
     help="Output wormhole state-machine transitions to the given file",
@@ -53,7 +65,7 @@ from .visual import littlebitspace_big_logo, littlebitspace_word_logo
 )
 @click.command()
 @click.pass_context
-def fowld(ctx, ip_privacy, mailbox, debug, version):
+def fowld(ctx, ip_privacy, mailbox, transit_helper, debug, version):
     """
     Forward Over Wormhole, Locally, Daemon
 
@@ -71,6 +83,7 @@ def fowld(ctx, ip_privacy, mailbox, debug, version):
         relay_url=WELL_KNOWN_MAILBOXES.get(mailbox, mailbox),
         use_tor=bool(ip_privacy),
         debug_file=debug,
+        transit_relay_location=WELL_KNOWN_TRANSITS.get(transit_helper, transit_helper),
     )
     def run(reactor):
         return ensureDeferred(
@@ -103,6 +116,16 @@ def fowld(ctx, ip_privacy, mailbox, debug, version):
     default=PUBLIC_MAILBOX_URL,
     help='URL for the mailbox server to use (or "default" or "winden" to use well-known servers)',
     metavar="URL or NAME",
+)
+@click.option(
+    "--transit-helper",
+    default=PUBLIC_TRANSIT_RELAY,
+    help=(
+        'Transit relay for Dilation, as a Twisted client-endpoint string '
+        '(e.g. "tcp:example.com:4001"), or "none" for direct-only connections '
+        '(no transit relay). Defaults to the public transit relay.'
+    ),
+    metavar="ENDPOINT or NAME",
 )
 @click.option(
     "--debug",
@@ -179,7 +202,7 @@ def fowld(ctx, ip_privacy, mailbox, debug, version):
 )
 @click.argument("code", required=False)
 @click.command()
-def fowl(ip_privacy, mailbox, debug, local, remote, code_length, code, readme, interactive, debug_messages, debug_status, replay, version, no_logo):
+def fowl(ip_privacy, mailbox, transit_helper, debug, local, remote, code_length, code, readme, interactive, debug_messages, debug_status, replay, version, no_logo):
     """
     Forward Over Wormhole, Locally
 
@@ -311,6 +334,7 @@ def fowl(ip_privacy, mailbox, debug, local, remote, code_length, code, readme, i
         output_debug_messages=debug_messages,
         output_status=debug_status,
         no_logo=no_logo,
+        transit_relay_location=WELL_KNOWN_TRANSITS.get(transit_helper, transit_helper),
     )
 
     if interactive:
