@@ -534,3 +534,75 @@ async def test_drawrof(reactor, request, mailbox, datasize, who, wait_peer):
         server.send(data)
         msg = await client_proto.next_message(len(data))
     assert msg == data, "Incorrect data transfer"
+
+
+@pytest_twisted.ensureDeferred
+async def test_ping(reactor, request, mailbox):
+    """
+    A ping sent over the JSON protocol, whose ping_id is an int, comes
+    back as a pong with the same ping_id.
+    """
+
+    stdios = [
+        None,
+        None,
+    ]
+
+    def create_stdin0(proto, reactor=None):
+        stdios[0] = FakeStandardIO(proto, reactor, messages=[])
+        return stdios[0]
+
+    def create_stdin1(proto, reactor=None):
+        stdios[1] = FakeStandardIO(proto, reactor, messages=[])
+        return stdios[1]
+
+    config0 = _Config(
+        relay_url=mailbox.url,
+        use_tor=False,
+        create_stdio=create_stdin0,
+        stdout=StringIO(),
+    )
+    d0 = ensureDeferred(forward(reactor, config0))
+    d0.addErrback(ignore_cancel)
+    await find_message(reactor, config0, kind="welcome")
+    stdios[0].proto.dataReceived(
+        json.dumps({
+            "kind": "allocate-code",
+        }).encode("utf8") + b"\n"
+    )
+    msg = await find_message(reactor, config0, kind="code-allocated")
+
+    config1 = _Config(
+        relay_url=mailbox.url,
+        use_tor=False,
+        create_stdio=create_stdin1,
+        stdout=StringIO(),
+        code=msg["code"],
+    )
+    d1 = ensureDeferred(forward(reactor, config1))
+    d1.addErrback(ignore_cancel)
+
+    def cleanup():
+        d0.cancel()
+        d1.cancel()
+    request.addfinalizer(cleanup)
+
+    await find_message(reactor, config1, kind="welcome")
+    stdios[1].proto.dataReceived(
+        json.dumps({
+            "kind": "set-code",
+            "code": config1.code,
+        }).encode("utf8") + b"\n"
+    )
+    await find_message(reactor, config0, kind="peer-connected")
+    await find_message(reactor, config1, kind="peer-connected")
+
+    stdios[0].proto.dataReceived(
+        json.dumps({
+            "kind": "ping",
+            "ping_id": 1234,
+        }).encode("utf8") + b"\n"
+    )
+    msg = await find_message(reactor, config0, kind="pong")
+    assert msg["ping_id"] == 1234
+    assert msg["time_of_flight"] >= 0

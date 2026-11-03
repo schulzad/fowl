@@ -7,7 +7,7 @@ import attrs
 from wormhole._status import Connected, Connecting, ConnectedPeer, NoCode, ConsumedCode, Disconnected, Failed, Closed
 from wormhole import DilationStatus, WormholeStatus
 
-from fowl.messages import BytesIn, BytesOut, OutgoingConnection, OutgoingDone, OutgoingLost, Listening, Welcome, PeerConnected, WormholeClosed, CodeAllocated, IncomingConnection, IncomingDone, IncomingLost, GotMessageFromPeer, FowlOutputMessage, WormholeError, AwaitingConnect
+from fowl.messages import BytesIn, BytesOut, OutgoingConnection, OutgoingDone, OutgoingLost, Listening, Welcome, PeerConnected, WormholeClosed, CodeAllocated, IncomingConnection, IncomingDone, IncomingLost, GotMessageFromPeer, FowlOutputMessage, WormholeError, AwaitingConnect, Pong
 
 
 @attrs.define
@@ -163,6 +163,11 @@ class _StatusTracker:
     def error(self, message):
         self._emit(
             WormholeError(message)
+        )
+
+    def pong(self, ping_id, time_of_flight):
+        self._emit(
+            Pong(ping_id, time_of_flight)
         )
 
     def added_local_service(self, name, listen_port, remote_connect_port):

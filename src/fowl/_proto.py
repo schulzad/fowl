@@ -1422,9 +1422,12 @@ class FowlWormhole:
                 if hasattr(self._wormhole._boss, "_D"):
                     if self._wormhole._boss._D._manager is not None:
                         def got_pong(round_trip):
-                            #XXX FIXME TODO
-                            self._daemon._message_out(Pong(msg.ping_id, round_trip))
-                        self._wormhole._boss._D._manager.send_ping(msg.ping_id, got_pong)
+                            self._coop._status_tracker.pong(msg.ping_id, round_trip)
+                        # Dilation wants exactly 4 bytes; fowld's JSON protocol carries an int
+                        ping_id = msg.ping_id
+                        if isinstance(ping_id, int):
+                            ping_id = struct.pack(">L", ping_id & 0xFFFFFFFF)
+                        self._wormhole._boss._D._manager.send_ping(ping_id, got_pong)
                     else:
                         raise Exception("Cannot send ping: not in Dilation")
                 else:
